@@ -1,0 +1,32 @@
+[package]
+name = "linuxcampam"
+version = "0.9.7+5"
+edition = "2021"
+authors = ["Vladush", "Dawson Hessler"]
+description = "Face authentication for Linux using PAM and AI models"
+
+[lib]
+name = "pam_linuxcampam"
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "linuxcampamd"
+path = "src/bin/linuxcampamd.rs"
+
+[[bin]]
+name = "linuxcampam"
+path = "src/bin/linuxcampam.rs"
+
+[[bin]]
+name = "check_opencl"
+path = "src/bin/check_opencl.rs"
+
+[dependencies]
+libc = "0.2"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tract-onnx = "0.23"
+image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
+
+[dev-dependencies]
+tempfile = "3"

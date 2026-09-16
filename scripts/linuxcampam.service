@@ -1,0 +1,15 @@
+[Unit]
+Description=LinuxCamPAM Facial Authentication Service
+After=network.target
+
+[Service]
+RuntimeDirectory=linuxcampam
+RuntimeDirectoryMode=0755
+ExecStartPre=-/bin/sh -c 'if command -v linux-enable-ir-emitter >/dev/null 2>&1; then linux-enable-ir-emitter run; fi'
+ExecStart=/usr/libexec/linuxcampam/detect_opencl.sh /usr/bin/linuxcampamd
+Restart=always
+User=root
+Group=root
+
+[Install]
+WantedBy=multi-user.target
