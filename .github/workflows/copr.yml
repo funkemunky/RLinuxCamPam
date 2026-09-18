@@ -4,14 +4,12 @@ on:
   push:
     branches: [ "main", "master" ]
     tags: [ "v*" ]
-  pull_request:
-    branches: [ "main", "master" ]
   workflow_dispatch:
     inputs:
       copr_project:
         description: 'Copr project (e.g. funkemunky/linuxcampam)'
         required: false
-        default: 'funkemunky/linuxcampam'
+        default: 'funkemunky/rlinuxcampam'
 
 env:
   COPR_PROJECT: ${{ github.event.inputs.copr_project || vars.COPR_PROJECT || 'funkemunky/linuxcampam' }}
@@ -21,7 +19,7 @@ jobs:
     name: Build SRPM & Submit to Copr
     runs-on: ubuntu-latest
     container:
-      image: fedora:40
+      image: fedora:44
 
     steps:
       - name: Install build tools and Copr CLI
