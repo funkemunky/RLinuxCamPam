@@ -7,12 +7,12 @@ on:
   workflow_dispatch:
     inputs:
       copr_project:
-        description: 'Copr project (e.g. funkemunky/linuxcampam)'
+        description: 'Copr project (e.g. funkemunky/rlinuxcampam)'
         required: false
         default: 'funkemunky/rlinuxcampam'
 
 env:
-  COPR_PROJECT: ${{ github.event.inputs.copr_project || vars.COPR_PROJECT || 'funkemunky/linuxcampam' }}
+  COPR_PROJECT: ${{ github.event.inputs.copr_project || vars.COPR_PROJECT || 'funkemunky/rlinuxcampam' }}
 
 jobs:
   build-srpm-and-submit:
