@@ -1,0 +1,141 @@
+name: Copr Build Pipeline
+
+on:
+  push:
+    branches: [ "main", "master" ]
+    tags: [ "v*" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+    inputs:
+      copr_project:
+        description: 'Copr project (e.g. funkemunky/linuxcampam)'
+        required: false
+        default: 'funkemunky/linuxcampam'
+
+env:
+  COPR_PROJECT: ${{ github.event.inputs.copr_project || vars.COPR_PROJECT || 'funkemunky/linuxcampam' }}
+
+jobs:
+  build-srpm-and-submit:
+    name: Build SRPM & Submit to Copr
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:40
+
+    steps:
+      - name: Install build tools and Copr CLI
+        run: |
+          dnf install -y git rpm-build rpmdevtools copr-cli curl tar gzip
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download & verify ONNX models
+        run: |
+          mkdir -p rpm/SOURCES
+          YUNET="rpm/SOURCES/face_detection_yunet_2023mar.onnx"
+          SFACE="rpm/SOURCES/face_recognition_sface_2021dec.onnx"
+          YUNET_SHA="8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4"
+          SFACE_SHA="0ba9fbfa01b5270c96627c4ef784da859931e02f04419c829e83484087c34e79"
+
+          download_and_verify() {
+            local url="$1" dest="$2" sha="$3"
+            if [ -f "$dest" ] && echo "$sha  $dest" | sha256sum -c --status 2>/dev/null; then
+              echo "$dest already present and verified."
+              return 0
+            fi
+            echo "Downloading $dest..."
+            curl -fSL --connect-timeout 15 --retry 3 -o "$dest" "$url"
+            echo "$sha  $dest" | sha256sum -c -
+          }
+
+          download_and_verify \
+            "https://github.com/opencv/opencv_zoo/raw/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx" \
+            "$YUNET" "$YUNET_SHA"
+
+          download_and_verify \
+            "https://huggingface.co/opencv/face_recognition_sface/resolve/main/face_recognition_sface_2021dec.onnx" \
+            "$SFACE" "$SFACE_SHA"
+
+      - name: Create source tarball
+        run: |
+          # Derive version from Cargo.toml (normalizing '+' to '.' for RPM compatibility)
+          CARGO_VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          RPM_VERSION="${CARGO_VERSION//+/.}"
+          PKG_NAME="linuxcampam-${RPM_VERSION}"
+          TARBALL="rpm/SOURCES/${PKG_NAME}.tar.gz"
+
+          echo "Creating source archive: ${TARBALL}"
+          tar --exclude='.git' \
+              --exclude='*/.git' \
+              --exclude='./target' \
+              --exclude='./rpm' \
+              --exclude='./.idea' \
+              --exclude='./models' \
+              --exclude='./debian' \
+              --exclude='*.swp' \
+              --exclude='*~' \
+              -czf "${TARBALL}" \
+              --transform "s|^\.|${PKG_NAME}|" \
+              .
+          echo "Tarball created successfully ($(du -sh "${TARBALL}" | cut -f1))."
+
+      - name: Build Source RPM (.src.rpm)
+        run: |
+          mkdir -p rpm/BUILD rpm/SRPMS
+          CARGO_VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          RPM_VERSION="${CARGO_VERSION//+/.}"
+
+          rpmbuild \
+            --define "_topdir $PWD/rpm" \
+            --define "_sourcedir $PWD/rpm/SOURCES" \
+            --define "_builddir $PWD/rpm/BUILD" \
+            --define "_srcrpmdir $PWD/rpm/SRPMS" \
+            --define "_version ${RPM_VERSION}" \
+            -bs rpm/SPECS/linuxcampam.spec
+
+          echo "Generated Source RPM:"
+          ls -lh rpm/SRPMS/*.src.rpm
+
+      - name: Upload SRPM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linuxcampam-srpm
+          path: rpm/SRPMS/*.src.rpm
+          if-no-files-found: error
+
+      - name: Configure Copr credentials
+        if: github.event_name != 'pull_request'
+        env:
+          COPR_CONFIG_DATA: ${{ secrets.COPR_CONFIG }}
+        run: |
+          if [ -z "$COPR_CONFIG_DATA" ]; then
+            echo "::warning::COPR_CONFIG secret is not set in repository secrets! Skipping submission to Copr."
+            echo "SUBMIT_SKIPPED=true" >> "$GITHUB_ENV"
+          else
+            mkdir -p ~/.config
+            echo "$COPR_CONFIG_DATA" > ~/.config/copr
+            chmod 600 ~/.config/copr
+            echo "Copr configuration written."
+          fi
+
+      - name: Submit build to Copr
+        if: github.event_name != 'pull_request'
+        run: |
+          if [ "${SUBMIT_SKIPPED:-false}" = "true" ]; then
+            echo "Skipping Copr build submission because COPR_CONFIG secret is not configured."
+            exit 0
+          fi
+
+          SRPM=$(find rpm/SRPMS -name "*.src.rpm" | head -1)
+          if [ -z "$SRPM" ]; then
+            echo "::error::No SRPM found to submit!"
+            exit 1
+          fi
+
+          echo "Submitting $SRPM to Copr project ${{ env.COPR_PROJECT }}..."
+          copr-cli build --nowait "${{ env.COPR_PROJECT }}" "$SRPM"
+          echo "Successfully queued build in Copr!"

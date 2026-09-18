@@ -7,8 +7,8 @@ Release:        %{?_release}%{!?_release:1}%{?dist}
 Summary:        Face authentication PAM module for Linux
 
 License:        MIT
-URL:            https://github.com/Vladush/LinuxCamPAM
-Source0:        https://github.com/Vladush/LinuxCamPAM/archive/v%{version}/%{crate_name}-%{version}.tar.gz
+URL:            https://github.com/funkemunky/RLinuxCamPam
+Source0:        https://github.com/funkemunky/RLinuxCamPam/archive/v%{version}/%{crate_name}-%{version}.tar.gz
 Source10:       https://github.com/opencv/opencv_zoo/raw/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx
 Source11:       https://huggingface.co/opencv/face_recognition_sface/resolve/main/face_recognition_sface_2021dec.onnx
 
@@ -141,8 +141,6 @@ if [ $1 -eq 0 ]; then
 fi
 
 %files
-%license upstream/LICENSE
-%doc upstream/README.md upstream/CHANGELOG.md
 
 # Binaries
 %{_bindir}/linuxcampamd
