@@ -449,7 +449,6 @@ version = "0.9.8"
 dependencies = [
  "image",
  "libc",
- "serde",
  "serde_json",
  "tempfile",
  "tract-onnx",
