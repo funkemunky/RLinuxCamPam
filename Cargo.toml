@@ -1,6 +1,6 @@
 [package]
 name = "linuxcampam"
-version = "0.9.7+5"
+version = "0.9.8"
 edition = "2021"
 authors = ["Vladush", "Dawson Hessler"]
 description = "Face authentication for Linux using PAM and AI models"
